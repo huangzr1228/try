@@ -1,0 +1,262 @@
+---
+title: "BIOSTAT620_project2"
+author: "Ruoer Bei"
+date: "2024-04-15"
+output: html_document
+---
+
+
+```{r}
+
+library(readxl)
+library(dplyr)
+library(stringr)
+
+
+convert_to_minutes <- function(time_str) {
+  
+  hrs <- as.numeric(str_extract(time_str, "\\d+(?=h)"))
+  mins <- as.numeric(str_extract(time_str, "\\d+(?=m)"))
+  
+  hrs[is.na(hrs)] <- 0
+  mins[is.na(mins)] <- 0
+  
+  total_mins <- hrs * 60 + mins
+  return(total_mins)
+}
+
+
+data1 <- read_excel("/Users/ruoerbei/Documents/BIOSTAT620/BIOSTAT620_project2/example1.xlsx")
+
+
+data1$mins <- sapply(data1$hour, convert_to_minutes)
+
+
+print(data1)
+
+```
+
+
+```{r}
+data2 <- read_excel("/Users/ruoerbei/Documents/BIOSTAT620/BIOSTAT620_project2/example2.xlsx")
+
+data2$mins <- sapply(data2$hour, convert_to_minutes)
+
+
+print(data2)
+
+
+
+
+```
+
+```{r}
+
+data3 <- read_excel("/Users/ruoerbei/Documents/BIOSTAT620/BIOSTAT620_project2/example3.xlsx")
+
+data3$mins <- sapply(data3$hour, convert_to_minutes)
+
+
+print(data3)
+
+
+```
+
+```{r}
+
+data4 <- read_excel("/Users/ruoerbei/Documents/BIOSTAT620/BIOSTAT620_project2/example4.xlsx")
+
+data4$mins <- sapply(data4$hour, convert_to_minutes)
+
+
+print(data4)
+
+```
+
+
+```{r}
+
+data5 <- read_excel("/Users/ruoerbei/Documents/BIOSTAT620/BIOSTAT620_project2/example5.xlsx")
+
+data5$mins <- sapply(data5$hour, convert_to_minutes)
+
+
+print(data5)
+
+```
+
+```{r}
+
+
+library(ggplot2)
+library(readxl)
+
+data_totalscreen <- read_excel("/Users/ruoerbei/Documents/BIOSTAT620/BIOSTAT620_project2/Fulldata_620W24_Project2.xlsx")
+
+ggplot(data_totalscreen, aes(y = `Total.ST.min`)) +
+  geom_boxplot() +
+  labs(title = "Box Plot of Total.ST.min", y = "Total.ST.min") +
+  theme_minimal()
+
+```
+```{r}
+
+
+Q1 <- quantile(data_totalscreen$`Total.ST.min`, 0.25, na.rm = TRUE)
+Q3 <- quantile(data_totalscreen$`Total.ST.min`, 0.75, na.rm = TRUE)
+
+IQR <- Q3 - Q1
+
+lower_bound <- Q1 - 1.5 * IQR
+upper_bound <- Q3 + 1.5 * IQR
+
+outliers <- subset(data_totalscreen, data_totalscreen$`Total.ST.min` < lower_bound | data_totalscreen$`Total.ST.min` > upper_bound)
+
+# Show outliers
+print(outliers)
+
+
+```
+
+```{r}
+
+data_proportion_over_1 <- subset(data_totalscreen, Proportion.ST > 1)
+
+print(data_proportion_over_1)
+
+
+
+
+
+```
+
+```{r}
+
+data_socialscreen <- read_excel("/Users/ruoerbei/Documents/BIOSTAT620/BIOSTAT620_project2/Fulldata_exclude_total_proportion_social.xlsx")
+
+ggplot(data_socialscreen, aes(y = `Social.ST.min`)) +
+  geom_boxplot() +
+  labs(title = "Box Plot of Social.ST.min", y = "Social.ST.min") +
+  theme_minimal()
+
+```
+
+```{r}
+
+Q1_social <- quantile(data_socialscreen$`Social.ST.min`, 0.25, na.rm = TRUE)
+Q3_social <- quantile(data_socialscreen$`Social.ST.min`, 0.75, na.rm = TRUE)
+
+IQR_social <- Q3_social - Q1_social
+
+lower_bound_social <- Q1_social - 1.5 * IQR_social
+upper_bound_social <- Q3_social + 1.5 * IQR_social
+
+outliers_social <- subset(data_socialscreen, data_socialscreen$`Social.ST.min` < lower_bound_social | data_socialscreen$`Social.ST.min` > upper_bound_social)
+
+# Show outliers
+print(outliers_social)
+
+
+```
+
+```{r}
+
+ggplot(data_socialscreen, aes(y = `Proportion.ST`)) +
+  geom_boxplot() +
+  labs(title = "Box Plot of Proportion.ST", y = "Proportion.ST") +
+  theme_minimal()
+
+```
+
+```{r}
+
+Q1_proportion <- quantile(data_socialscreen$`Proportion.ST`, 0.25, na.rm = TRUE)
+Q3_proportion <- quantile(data_socialscreen$`Proportion.ST`, 0.75, na.rm = TRUE)
+
+IQR_proportion <- Q3_proportion - Q1_proportion
+
+lower_bound_proportion <- Q1_proportion - 1.5 * IQR_proportion
+upper_bound_proportion <- Q3_proportion + 1.5 * IQR_proportion
+
+outliers_proportion <- subset(data_socialscreen, data_socialscreen$`Proportion.ST` < lower_bound_proportion | data_socialscreen$`Proportion.ST` > upper_bound_proportion)
+
+print(outliers_proportion)
+
+```
+
+```{r}
+
+ggplot(data_socialscreen, aes(y = `Duration.per.use`)) +
+  geom_boxplot() +
+  labs(title = "Box Plot of Duration.per.use", y = "Duration.per.use") +
+  theme_minimal()
+
+```
+
+```{r}
+
+Q1_duration <- quantile(data_socialscreen$`Duration.per.use`, 0.25, na.rm = TRUE)
+Q3_duration <- quantile(data_socialscreen$`Duration.per.use`, 0.75, na.rm = TRUE)
+
+IQR_duration <- Q3_duration - Q1_duration
+
+lower_bound_duration <- Q1_duration - 1.5 * IQR_duration
+upper_bound_duration <- Q3_duration + 1.5 * IQR_duration
+
+outliers_duration <- subset(data_socialscreen, data_socialscreen$`Duration.per.use` < lower_bound_duration | data_socialscreen$`Duration.per.use` > upper_bound_duration)
+
+print(outliers_duration)
+
+```
+
+```{r}
+
+data_baseline <- read_excel("/Users/ruoerbei/Documents/BIOSTAT620/BIOSTAT620_project2/baseline.xlsx")
+
+print(data_baseline)
+
+```
+
+```{r}
+library(mice)
+mi.dat = mice(data_baseline)
+mi.dat1 = mice(data_baseline, method = "sample")
+complete(mi.dat)
+```
+
+```{r}
+
+analyzed_models <- with(data = mi.dat, exp = {
+  lm(procrastination_score ~ workmate + X2_academic_talk + non_academic+pets+age+cousre_credit+siblings+apps+devices+Treatment)  
+})
+pooled_results <- pool(analyzed_models)
+summary(pooled_results)
+
+```
+
+
+`
+
+```{r}
+
+
+data_screentime <- read_excel("/Users/ruoerbei/Documents/BIOSTAT620/BIOSTAT620_project2/screentime.xlsx")
+
+print(data_screentime)
+
+mi.dat_screentime = mice(data_screentime)
+mi.dat1_screentime = mice(data_screentime, method = "sample")
+complete(mi.dat_screentime)
+
+completed_data <- complete(mi.dat_screentime)
+
+```
+
+```{r}
+
+library(writexl)
+
+write_xlsx(completed_data, path="/Users/ruoerbei/Documents/BIOSTAT620/BIOSTAT620_project2/completed_screentime.xlsx")
+
+```
+

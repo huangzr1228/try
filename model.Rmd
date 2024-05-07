@@ -1,0 +1,221 @@
+---
+title: "Untitled"
+author: "Mimi Li"
+date: "2024-04-17"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#install.packages("forecast")
+#install.packages("car")
+library(readxl)
+library(dplyr)
+library(purrr)
+library(broom)
+library(forecast)
+library(car)
+library(ggplot2)
+```
+
+```{r}
+data <- read_excel("/Users/mimi/Desktop/school/Umich/year 1/Winter/Biostat 620/Proj2/final_data.xlsx")
+
+data$Date <- as.Date(data$Date)
+
+data$day <- ifelse(weekdays(data$Date) %in% c("Saturday", "Sunday"), 0, 1)
+data$intervention <- ifelse(data$Date >= as.Date("2024-03-27"), 1, 0)
+```
+
+```{r}
+data <- data %>% 
+  group_by(pseudo_ID) %>%
+  mutate(pick_lag = lag(Pickups, n = 1)) %>%
+  mutate(st_lag = lag(Total.ST.min, n = 1)) %>%
+  ungroup()
+data$age_normalized <- scale(data$age, center = TRUE, scale = TRUE)
+data$procrastination_score_normalized <- scale(data$procrastination_score, center = TRUE, scale = TRUE)
+```
+
+```{r}
+dataA <- data %>% 
+  filter(Treatment == 'A')
+
+modelA1 <- lm(Total.ST.min ~ st_lag + intervention + procrastination_score_normalized + age_normalized + day + apps + procrastination_score_normalized * intervention, data = dataA)
+
+modelA2 <- glm(formula = Pickups ~ log(pick_lag) + intervention + procrastination_score_normalized + age_normalized + day + apps + procrastination_score_normalized * intervention, family = poisson(link = "log"), data = dataA, offset = log(Total.ST.min))
+
+summary(modelA1)
+```
+
+
+Table 2.1: Linear regression results for the effect of intervention A on total screen time
+
+| Variable                                        | Estimate | Std. Error | t value | p value     |
+|-------------------------------------------------|----------|------------|---------|-------------|
+| Intercept                                       | 188.63   | 17.45      | 10.81   | < 2e-16 *** |
+| Lagged Total Screen Time                        | 0.46     | 0.03       | 15.78   | < 2e-16 *** |
+| Intervention                                    | -63.75   | 17.11      | -3.73   | 2.06e-04*** |
+| Procrastination Score (Normalized)              | -32.12   | 8.32       | -3.86   | 1.21e-04*** |
+| Age (Normalized)                                | -44.63   | 5.10       | -8.75   | < 2e-16 *** |
+| Day (Weekday vs. Weekend)                       | -9.92    | 11.38      | -0.87   | 0.38        |
+| Number of Apps                                  | 12.17    | 2.68       | 4.53    | 6.55e-06 ***|
+| Intervention * Procrastination Score (Norm)     | -84.68   | 21.06      | -4.02   | 6.30e-05 ***|
+|------------------------------------------------
+|Note: *** indicates p < 0.001.                   |          |            |         |             |
+
+
+Table 2.2: Poisson regression results for the effect of intervention A on daily total pickups
+
+| Variable                                        | Estimate | Std. Error | z value | p value     |
+|-------------------------------------------------|----------|------------|---------|-------------|
+| Intercept                                       | -3.18    | 3.39e-02   | -93.78  | < 2e-16 *** |
+| Log of Lagged Pickups                           | 0.39     | 7.45e-03   | 52.97   | < 2e-16 *** |
+| Intervention                                    | 0.17     | 1.17e-02   | 14.10   | < 2e-16 *** |
+| Procrastination Score (Normalized)              | 0.10     | 5.05e-03   | 19.48   | < 2e-16 *** |
+| Age (Normalized)                                | 0.07     | 7.74e-03   | 9.21    | < 2e-16 *** |
+| Day (Weekday vs. Weekend)                       | 0.24     | 8.07e-03   | 29.54   | < 2e-16 *** |
+| Number of Apps                                  | -0.06    | 1.86e-03   | -30.78  | < 2e-16 *** |
+| Intervention * Procrastination Score (Norm)     | 0.28     | 1.33e-03   | 20.88   | < 2e-16 *** |
+|------------------------------------------------
+|Note: *** indicates p < 0.001.                   |          |            |         |             |
+
+
+# Intervention B
+```{r}
+dataB <- data %>% 
+  filter(Treatment == 'B')
+
+modelB1 <- glm(formula = Pickups ~ log(pick_lag) + intervention + procrastination_score_normalized + age_normalized + day + apps + procrastination_score_normalized * intervention, family = poisson(link = "log"), data = dataB, offset = log(Total.ST.min))
+
+modelB2 <- lm(Total.ST.min ~ st_lag + intervention + procrastination_score_normalized + age_normalized + day + apps + procrastination_score_normalized * intervention, data = dataB)
+
+summary(modelB1)
+```
+
+Table 2.3: Poisson regression results for the effect of intervention B on daily total pickups
+
+| Variable                                       | Estimate | Std. Error | z value | p value    |
+|------------------------------------------------|----------|------------|---------|------------|
+| Intercept                                      | -3.50    | 3.50e-02   | -100.02 | < 2e-16 ***|
+| Log of Lagged Pickups                          | 0.49     | 7.32e-03   | 67.57   | < 2e-16 ***|
+| Intervention                                   | -0.17    | 1.15e-02   | -14.91  | < 2e-16 ***|
+| Procrastination Score (Normalized)             | -0.05    | 2.90e-03   | -17.87  | < 2e-16 ***|
+| Age (Normalized)                               | 0.05     | 5.54e-03   | 8.46    | < 2e-16 ***|
+| Day (Weekday vs. Weekend)                      | 0.26     | 6.56e-03   | 31.69   | < 2e-16 ***|
+| Number of Apps                                 | -0.04    | 1.87e-03   | -24.02  | < 2e-16 ***|
+| Intervention * Procrastination Score (Norm)    | -0.01    | 1.07e-02   | -1.00   | 0.32       |
+|------------------------------------------------
+|Note: *** indicates p < 0.001.
+
+Table 2.4: Linear regression results for the effect of intervention B on total screen time
+
+| Variable                                      | Estimate | Std. Error | t value | p value     |
+|-----------------------------------------------|----------|------------|---------|-------------|
+| Intercept                                     | 105.10   | 14.31      | 7.34    | 3.83e-13 ***|
+| Lagged Total Screen Time                      | 0.68     | 0.02       | 31.77   | < 2e-16 *** |
+| Intervention                                  | -11.15   | 12.50      | -0.89   | 0.37        |
+| Procrastination Score (Normalized)            | 12.54    | 3.86       | 3.25    | 1.18e-03**  |
+| Age (Normalized)                              | -11.81   | 6.73       | -1.76   | 0.08    .   |
+| Day (Weekday vs. Weekend)                     | -1.63    | 8.38       | -0.19   | 0.85        |
+| Number of Apps                                | 5.02     | 2.48       | 2.03    | 0.04    *   |
+| Intervention * Procrastination Score (Norm)   | 0.12     | 11.22      | 0.01    | 0.99        |
+
+
+Table 2.5: Logistic regression results for the compliance of intervention 
+
+| Variable                                       | Estimate | Std. Error | z value | p value    |
+|------------------------------------------------|----------|------------|---------|------------|
+| Intercept                                      | -0.55    | 0.81       | -0.67   | 0.50       |
+| Lagged Compliance                              | 2.44     | 0.38       | 6.35    | 2.21e-10***|
+| Average Total Social Screen Time (min)         | -1.00e-03| 1.50e-03   | -0.86   | 0.39       |
+| Age (Normalized)                               | 0.23     | 0.26       | 0.89    | 0.37       |
+| Procrastination Score (Normalized)             | 0.19     | 0.20       | 0.99    | 0.32       |
+| Day (Weekday vs. Weekend)                      | -0.23    | 0.40       | -0.57   | 0.57       |
+| Number of Apps                                 | 0.01     | 0.11       | 0.16    | 0.87       |
+|------------------------------------------------
+|Note: *** indicates p < 0.001.
+
+## Diagnosis
+```{r}
+# Deviance residuals
+deviance_residuals <- residuals(modelA2, type = "deviance")
+
+# Pearson residuals
+pearson_residuals <- residuals(modelA2, type = "pearson")
+
+# Deviance residuals plot
+plot(deviance_residuals, main="Deviance Residuals", xlab="Observation Number", ylab="Deviance Residuals")
+abline(h=0, col="red")
+
+# Pearson residuals plot
+plot(pearson_residuals, main="Pearson Residuals", xlab="Observation Number", ylab="Pearson Residuals")
+abline(h=0, col="red")  
+```
+
+
+```{r}
+cooks_d <- cooks.distance(modelB1)
+# Cook's distance
+plot(cooks_d, type = "h", main = "Cook's distance")
+abline(h = 4/length(cooks_d), col = "red") 
+
+# larger than 4/n 
+influential_points <- which(cooks_d > (4/length(cooks_d)))
+print(influential_points)
+```
+
+```{r}
+#install.packages("car")
+# multicollinearity
+library(car)
+vif(modelB1)
+```
+
+```{r}
+pearson_resid <- residuals(modelA2, type = "pearson")
+dispersion_statistic <- sum(pearson_resid^2) / modelA2$df.residual
+dispersion_statistic
+```
+
+```{r}
+modelB2.res = modelB2$residuals
+hist(modelB2.res,breaks=15)
+qq.modelB2.res = car::qqPlot(modelB2.res)
+```
+```{r}
+residualPlots(modelA1,type="response")
+
+
+# Now, manually create the residuals vs fitted values plot
+fitted_values <- fitted(modelA1)
+residuals <- residuals(modelA1)
+
+# Create the plot
+plot(fitted_values, residuals,
+     xlab = "Fitted Values",
+     ylab = "Residuals",
+     main = "Residuals vs Fitted Values")
+abline(h = 0, col = "red") # adds a horizontal line at zero
+
+```
+```{r}
+modelB2.yhat = modelB2$fitted.values
+modelB2.res = modelB2$residuals #m1.yhat-fev
+modelB2.h = hatvalues(modelB2) #leverage
+modelB2.r = rstandard(modelB2) #internally studentized residuals
+modelB2.rr = rstudent(modelB2)
+ggplot(modelB2, aes(x = modelB2.yhat, y = modelB2.res)) +
+  geom_point(alpha = 0.8) +
+  geom_hline(yintercept = 0,
+             linetype = "dashed",
+             color = "black") +
+  labs(title = "Constant variance check",
+       x = "y hat",
+       y = "Residuals") +
+  theme_minimal()
+```
+

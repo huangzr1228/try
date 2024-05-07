@@ -1,0 +1,290 @@
+---
+title: "Untitled"
+output: html_document
+date: "2024-04-17"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(dplyr)
+library(readxl)
+```
+
+```{r}
+screentime <- read_excel("D:/Umich/BIOSTAT620/project/project2/datanew/after_imputation_1.xlsx", sheet="screentime", na = "NA")
+```
+```{r}
+screentime <- screentime[, -3] # Delete the column "Day"
+```
+
+
+```{r}
+baseline <- read_excel("D:/Umich/BIOSTAT620/project/project2/datanew/baseline.xlsx", na = "NA")
+```
+
+```{r}
+baseline$pseudo_ID <- baseline$pseudo_id # add the column "pseudo_ID
+baseline <- baseline[, -1] # Delete the column "pseudo_id"
+```
+
+```{r}
+data <- inner_join(screentime, baseline, by = "pseudo_ID")
+head(data)
+```
+
+```{r}
+data$Date <- as.Date(data$Date)
+data <- data %>%
+  mutate(compliance = case_when(
+    Treatment == "A" & Date > as.Date("2024-03-27") & Social.ST.min > 200 ~ 0,
+    Treatment == "A" & Date > as.Date("2024-03-27") & Social.ST.min <= 200 ~ 1,
+    Date < as.Date("2024-03-27") ~ NA_real_,  
+    TRUE ~ compliance 
+  ))
+
+data <- data %>%
+  mutate(compliance = case_when(
+    Treatment == "B" & Date > as.Date("2024-03-27") & Pickups > 50 ~ 0,
+    Treatment == "B" & Date > as.Date("2024-03-27") & Pickups <= 50 ~ 1,
+    Date < as.Date("2024-03-27") ~ NA_real_,  
+    TRUE ~ compliance 
+  ))
+```
+
+```{r}
+#install.packages("writexl")
+```
+
+```{r}
+library(writexl)
+write_xlsx(data, path="D:/Umich/BIOSTAT620/project/project2/datanew/completed_data1.xlsx")
+```
+
+```{r}
+na_pseudo_ids <- data %>%
+  group_by(pseudo_ID) %>%
+  summarise(all_na = all(is.na(compliance))) %>%
+  filter(all_na) %>%
+  pull(pseudo_ID)
+print(na_pseudo_ids)
+```
+```{r}
+data <- data %>%
+  filter(!pseudo_ID %in% c(6759, 9285))
+```
+
+```{r}
+na_pseudo_ids <- data %>%
+  group_by(pseudo_ID) %>%
+  summarise(all_na = all(is.na(compliance))) %>%
+  filter(all_na) %>%
+  pull(pseudo_ID)
+print(na_pseudo_ids)
+```
+
+```{r}
+library(writexl)
+write_xlsx(data, path="D:/Umich/BIOSTAT620/project/project2/datanew/completed_data2.xlsx")
+```
+
+```{r}
+data <- data %>%
+  mutate(intervention = ifelse(Date < as.Date("2024-03-27"), 0, 1))
+```
+
+```{r}
+data1 <- read_excel("D:/Umich/BIOSTAT620/project/project2/datanew/Copy of completed_data2.xlsx", na = "NA")
+data1$Date <- as.Date(data1$Date)
+data1 <- data1 %>%
+  filter(Date > as.Date("2024-01-15"))
+data1 <- data1 %>%
+  mutate(intervention = ifelse(Date < as.Date("2024-03-27"), 0, 1))
+```
+
+```{r}
+write_xlsx(data1, path="D:/Umich/BIOSTAT620/project/project2/datanew/completed_data3.xlsx")
+```
+
+```{r}
+data1 <- data1 %>%
+  group_by(pseudo_ID) %>%
+  mutate(Pickups_1 = lag(Pickups, n = 1, default = NA)) %>%
+  ungroup()
+```
+
+```{r}
+model <- glm(formula = Pickups ~ offset(log(Total.ST.min)) + log(Pickups_1) + intervention + age + pets + siblings + apps + procrastination_score, 
+            family = poisson(link = "log"), 
+            data = data1)
+summary(model)
+```
+
+```{r}
+data1 <- data1 %>%
+  group_by(pseudo_ID) %>%
+  mutate(Total.ST.min_1 = lag(Total.ST.min, n = 1, default = NA)) %>%
+  ungroup()
+```
+
+```{r}
+model1 <- lm(Total.ST.min ~ Total.ST.min_1 + intervention + age + pets + siblings + apps + procrastination_score, 
+            data = data1)
+summary(model1)
+```
+
+```{r}
+data1$age_normalized <- scale(data1$age, center = TRUE, scale = TRUE)
+data1$procrastination_score_normalized <- scale(data1$procrastination_score, center = TRUE, scale = TRUE)
+
+model2 <- lm(Total.ST.min ~ Total.ST.min_1 + intervention + age_normalized + pets + siblings + apps + procrastination_score_normalized, 
+            data = data1)
+summary(model2)
+```
+```{r}
+data_A <- data1 %>% 
+  filter(Treatment == 'A')
+
+modelA <- lm(Total.ST.min ~ Total.ST.min_1 + intervention + age_normalized + pets + siblings + apps + procrastination_score_normalized, 
+            data = data_A)
+summary(modelA)
+```
+
+```{r}
+data_B <- data1 %>% 
+  filter(Treatment == 'B')
+
+modelB <- glm(formula = Pickups ~ offset(log(Total.ST.min)) + log(Pickups_1) + intervention + age_normalized + pets + siblings + apps + procrastination_score_normalized + intervention*procrastination_score_normalized, 
+            family = poisson(link = "log"), 
+            data = data_B)
+summary(modelB)
+```
+
+```{r}
+data2 <- data1 %>%
+  group_by(pseudo_ID) %>%
+  mutate(avg_Total.ST.min = mean(Total.ST.min[Date < as.Date("2024-03-27")], na.rm = TRUE)) %>%
+  ungroup() %>%
+  filter(compliance == 0 | compliance == 1)
+
+model_c <- glm(formula = compliance ~ avg_Total.ST.min + age_normalized + pets + siblings + apps + procrastination_score_normalized, 
+            family = binomial(), 
+            data = data2)
+summary(model_c)
+```
+
+```{r}
+data3 <- read_excel("D:/Umich/BIOSTAT620/project/project2/datanew/completed_data3.xlsx", na = "NA")
+```
+
+```{r}
+data3$Date <- as.Date(data3$Date)
+data4 <- data3 %>%
+  group_by(pseudo_ID) %>%
+  mutate(avg_Total.ST.min = mean(Total.ST.min[Date < as.Date("2024-03-27")], na.rm = TRUE)) %>%
+  ungroup() %>%
+  filter(compliance == 0 | compliance == 1)
+```
+
+```{r}
+data4$age_normalized <- scale(data4$age, center = TRUE, scale = TRUE)
+data4$procrastination_score_normalized <- scale(data4$procrastination_score, center = TRUE, scale = TRUE)
+```
+
+```{r}
+model_c <- glm(formula = compliance ~ avg_Total.ST.min + age_normalized + pets + siblings + apps + procrastination_score_normalized, 
+            family = binomial(link = "logit"), 
+            data = data4)
+summary(model_c)
+```
+
+```{r}
+
+
+model_c <- glm(formula = compliance ~ avg_Total.ST.min + age_normalized + pets + siblings + apps + procrastination_score_normalized, 
+            family = binomial(link = "logit"), 
+            data = data4)
+summary(model_c)
+```
+
+$$
+\log\left(\frac{p}{1-p}\right) = \beta_0 + \beta_1 \cdot \text{avg_Total.ST.min} + \beta_2 \cdot \text{age_normalized} + \beta_3 \cdot \text{pets} + \beta_4 \cdot \text{siblings} + \beta_5 \cdot \text{apps} + \beta_6 \cdot \text{procrastination_score_normalized}
+$$
+
+$$
+p = \frac{e^{\beta_0 + \beta_1 \cdot \text{avg_Total.ST.min} + \beta_2 \cdot \text{age_normalized} + \beta_3 \cdot \text{pets} + \beta_4 \cdot \text{siblings} + \beta_5 \cdot \text{apps} + \beta_6 \cdot \text{procrastination_score_normalized}}}{1 + e^{\beta_0 + \beta_1 \cdot \text{avg_Total.ST.min} + \beta_2 \cdot \text{age_normalized} + \beta_3 \cdot \text{pets} + \beta_4 \cdot \text{siblings} + \beta_5 \cdot \text{apps} + \beta_6 \cdot \text{procrastination_score_normalized}}}
+$$
+
+```{r}
+data4 <- data4 %>%
+  group_by(pseudo_ID) %>%
+  mutate(compliance_1 = lag(compliance, n = 1, default = NA)) %>%
+  ungroup()
+```
+
+```{r}
+data4 <- data4 %>%
+  mutate(day = ifelse(weekdays(as.Date(Date)) %in% c('星期六', '星期日'), 0, 1))
+```
+
+```{r}
+model_c1 <- glm(formula = compliance ~ compliance_1 + avg_Total.ST.min + age_normalized + day + apps + procrastination_score_normalized, 
+            family = binomial(link = "logit"), 
+            data = data4)
+summary(model_c1)
+```
+
+```{r}
+# Deviance residuals
+deviance_residuals <- residuals(model_c1, type = "deviance")
+
+# Pearson residuals
+pearson_residuals <- residuals(model_c1, type = "pearson")
+
+# Deviance residuals plot
+plot(deviance_residuals, main="Deviance Residuals", xlab="Observation Number", ylab="Deviance Residuals")
+abline(h=0, col="red")
+
+# Pearson residuals plot
+plot(pearson_residuals, main="Pearson Residuals", xlab="Observation Number", ylab="Pearson Residuals")
+abline(h=0, col="red")   
+```
+
+Influence measure
+```{r}
+cooks_d <- cooks.distance(model_c1)
+# Cook's distance
+plot(cooks_d, type = "h", main = "Cook's distance")
+abline(h = 4/length(cooks_d), col = "red") 
+
+# larger than 4/n 
+influential_points <- which(cooks_d > (4/length(cooks_d)))
+print(influential_points)
+```
+
+
+```{r}
+# multicollinearity
+library(car)
+vif(model_c1)
+```
+
+
+Table 2.5: Logistic regression results for the compliance of intervention 
+
+| Variable                                       | Estimate | Std. Error | z value | p value    |
+|------------------------------------------------|----------|------------|---------|------------|
+| Intercept                                      | -0.55    | 0.81       | -0.67   | 0.50       |
+| Lagged Compliance                              | 2.44     | 0.38       | 6.35    | 2.21e-10***|
+| Average Total Social Screen Time (min)         | -0.00    | 0.00       | -0.86   | 0.39       |
+| Age (Normalized)                               | 0.23     | 0.26       | 0.89    | 0.37       |
+| Procrastination Score (Normalized)             | 0.19     | 0.20       | 0.99    | 0.32       |
+| Day (Weekday vs. Weekend)                      | -0.23    | 0.40       | -0.57   | 0.57       |
+| Number of Apps                                 | 0.01     | 0.11       | 0.16    | 0.87       |
+|------------------------------------------------
+|Note: *** indicates p < 0.001.
+
+
+
